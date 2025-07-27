@@ -12,13 +12,24 @@ function initSocket(server) {
 
     io.on('connection', (socket) => {
         console.log('Cliente conectado:', socket.id);
-        // Se pueden agregar listeners personalizados aquí si se requiere
+        // Listener para que el cliente se una a su sala de usuario
+        socket.on('joinUserRoom', (userId) => {
+            if (userId) {
+                socket.join(`user_${userId}`);
+                console.log(`Socket ${socket.id} unido a sala user_${userId}`);
+            }
+        });
     });
 }
 
+// order: debe tener .usuario (ObjectId o string), .estado, ._id
 function emitOrderStatusChange(order) {
-    if (io) {
-        io.emit('orderStatusChanged', order);
+    if (io && order && order.usuario) {
+        // Emitir solo a la sala del usuario
+        io.to(`user_${order.usuario}`).emit('orderStatusChanged', {
+            status: order.estado,
+            orderId: order._id
+        });
     }
 }
 

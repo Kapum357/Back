@@ -1,18 +1,21 @@
-
-
 const express = require('express');
+const cors = require('cors');
 const app = express();
 const jwt = require('jsonwebtoken');
 const http = require('http');
 const server = http.createServer(app);
-const { initSocket } = require('./socket');
+const { initSocket, emitOrderStatusChange } = require('./socket');
 const connectDB = require('./services/db');
 
 // Conexión centralizada a MongoDB
+
+// Inicializar socket.io
+initSocket(server);
 connectDB();
 
 
 app.use(express.json());
+app.use(cors());
 
 // Middleware de autenticación JWT
 function authenticateToken(req, res, next) {
@@ -25,7 +28,12 @@ function authenticateToken(req, res, next) {
     next();
   });
 }
-// Importar rutas modulares
+// Importar modelos y rutas modulares
+const Usuario = require('../models/Usuario');
+const Producto = require('../models/Producto');
+const Pedido = require('../models/Pedido');
+const Mesa = require('../models/Mesa');
+const roles = ['admin', 'waiter', 'kitchen'];
 const usuarioRoutes = require('../routes/usuarioRoutes');
 const mesaRoutes = require('../routes/mesaRoutes');
 const productoRoutes = require('../routes/productoRoutes');
@@ -212,7 +220,12 @@ app.put('/orders/:id', authenticateToken, async (req, res) => {
         }
         await pedido.save();
         if (statusChanged) {
-            emitOrderStatusChange(pedido);
+            // Emitir evento solo si el pedido tiene usuario
+            emitOrderStatusChange({
+                usuario: pedido.usuario,
+                estado: pedido.status || pedido.estado,
+                _id: pedido._id
+            });
         }
         res.json({ message: 'Pedido actualizado' });
     } catch (err) {
